@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block form %}
+    <form action="/answer" method="POST">
+        {% for choice in range(choices| length) %}
+            <input type="radio" name="choice" value="{{choices[choice]}}" id="{{choice}}">
+            <label for="{{choice}}">{{choices[choice]}}</label>
+        {% endfor %}
+        <button>Submit</button>
+        <input type="hidden" name="next-id" value="{{id}}">
+    </form>
+{% endblock %}
