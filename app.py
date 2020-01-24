@@ -1,32 +1,94 @@
-from flask import Flask, request, render_template, redirect
+from flask import Flask, request, render_template, redirect, session, flash
 from flask_debugtoolbar import DebugToolbarExtension
 import surveys
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "oh-so-secret"
+app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 
+debug = DebugToolbarExtension(app)
 
-responses = []
-title = surveys.satisfaction_survey.title
+TITLE = surveys.satisfaction_survey.title
+NUM_QUESTIONS = len(surveys.satisfaction_survey.questions)
+
 
 @app.route('/')
 def base():
+    """Main page to tell user to start survey"""
+
     instructions = surveys.satisfaction_survey.instructions
-    return render_template('base.html', title=title, instructions=instructions)
+    return render_template('base.html', title=TITLE, instructions=instructions)
+
+
+@app.route('/start', methods=["POST"])
+def init_responses():
+    """Direct here to reset variables"""
+
+    session["responses"] = []
+    session["current_question"] = 0
+    return redirect("/questions/0")
+
 
 @app.route('/questions/<int:id>')
 def questions(id):
+    """Show question form, redirect if user is screwing around"""
+
+    if session.get("current_question") == None:
+        return redirect('/')
+
+    # Already done with survey -> thanks page
+    current_question = session['current_question']
+    if current_question >= NUM_QUESTIONS:
+        return redirect('/Thanks')
+
+    # Inserting incorrect question during survey -> correct question
+    if id != current_question:
+        flash("Stop! Hey! Listen! You did the wrong question!")
+        return redirect(f'/questions/{current_question}')
+
     question_obj = surveys.satisfaction_survey.questions[id]
     question = question_obj.question
     choices = question_obj.choices
 
-    return render_template('question.html', title=title, instructions=question, choices=choices, id=(id+1))
+    return render_template(
+        'question.html',
+        title=TITLE,
+        instructions=question,
+        choices=choices)
+
+
+@app.route('/Thanks')
+def thank():
+    """Thanks page""""
+    if session.get("current_question") != NUM_QUESTIONS:
+        flash("No thanks for you")
+        return redirect('/')
+
+    return "<p style='font-size: 260'>THANK YOU</p>"
 
 
 @app.route('/answer', methods=['POST'])
 def answers():
-    next_question = request.form['next-id']
-    responses.append(request.form['choice'])
-    
-    return redirect(f'/questions/{next_question}')
+    """Increment questions and redirect"""
 
+    # somehow got here without starting session
+    if session.get("responses") == None:
+        return redirect('/')
+
+    next_question = session.get("current_question", -1) + 1
+
+    # only add answer if next_question wasn't set above
+    if next_question > 0:
+        responses = session["responses"]
+        responses.append(request.form['choice'])
+        session["responses"] = responses
+
+    session["current_question"] = next_question
+
+    # thanks when done, next question otherwise
+    next_page = (
+        f'/questions/{next_question}'
+        if int(next_question) < NUM_QUESTIONS
+        else '/Thanks')
+
+    return redirect(next_page)
