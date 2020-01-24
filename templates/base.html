@@ -7,14 +7,19 @@
     <title>Document</title>
 </head>
 <body>
-    <h1>{{title}}</h1>
-        {% for message in get_flashed_messages()%}
-            <p>{{ message }}</p>
-        {% endfor %}
     <p>{{instructions}}</p>
+    {% for message in get_flashed_messages()%}
+        <p>{{ message }}</p>
+    {% endfor %}
+    
 
     {% block form %}
+        <h2>Please select a survey:</h2>
         <form action="/start" method="POST">
+            {% for (survey, object) in surveys.items() %}
+                <input type="radio" name="choice" value="{{survey}}" id="{{survey}}">
+                <label for="{{survey}}">{{object.title}}</label>
+            {% endfor %}
             <button>Start Survey</button>
         </form>
     {% endblock %}
